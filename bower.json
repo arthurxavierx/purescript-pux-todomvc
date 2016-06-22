@@ -1,0 +1,8 @@
+{
+  "name": "purescript-pux-todomvc",
+  "author": "Arthur Xavier <arthur.xavierx@gmail.com>",
+  "dependencies": {
+    "purescript-pux": "^4.0.0",
+    "purescript-pux-devtool": "^2.0.0"
+  }
+}
