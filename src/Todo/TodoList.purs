@@ -2,15 +2,17 @@ module Todo.TodoList where
 
 import Prelude
 
-import Data.Array (null, filter, length, mapMaybe, (:))
+import Todo.Todo as Todo
+import DOM (DOM)
+import Data.Array (concatMap, mapMaybe, null, filter, length, (:))
 import Data.Foldable (all)
 import Data.Maybe (Maybe(Just))
 import Data.Tuple (Tuple(Tuple))
+import Pux (mapEffects, EffModel, noEffects)
 import Pux.Html (Attribute, button, li, Html, text, strong, span, footer, ul, label, input, section, h1, header)
 import Pux.Html.Attributes (style, className, htmlFor, checked, type_, autoFocus, value, placeholder)
 import Pux.Html.Events (onInput, onClick, onKeyDown, onChange)
 import Pux.Router (link)
-import Todo.Todo as Todo
 import Todo.Filter (Filter(..), predicate)
 
 data Action
@@ -31,37 +33,41 @@ type Model =
 init :: Model
 init = { field: "", tasks: [], uid: 0, filter: All }
 
-update :: Action -> Model -> Model
+update :: Action -> Model -> EffModel Model Action (dom :: DOM)
 update action model =
   case action of
     Nop ->
-      model
+      noEffects $ model
 
     Insert description ->
-      model {
-        field = ""
-      , tasks = (Todo.init description model.uid) : model.tasks
-      , uid = model.uid+1 }
+      noEffects $
+        model {
+          field = ""
+        , tasks = (Todo.init description model.uid) : model.tasks
+        , uid = model.uid+1 }
 
-    Update id taskAction -> do
-      model { tasks = mapMaybe (updateTask taskAction id) model.tasks }
+    Update id taskAction ->
+      let updatedTasks = map (updateTask taskAction id) model.tasks
+      in
+        { state: model { tasks = mapMaybe _.state updatedTasks }
+        , effects: concatMap (_.effects <<< mapEffects (Update id)) updatedTasks }
 
     CheckAll check ->
-      model { tasks = map (_ { completed = check }) model.tasks }
+      noEffects $ model { tasks = map (_ { completed = check }) model.tasks }
 
     ClearCompleted ->
-      model { tasks = filter (not _.completed) model.tasks }
+      noEffects $ model { tasks = filter (not _.completed) model.tasks }
 
     ChangeFilter filter ->
-      model { filter = filter }
+      noEffects $ model { filter = filter }
 
     EditField field ->
-      model { field = field }
+      noEffects $ model { field = field }
   where
-    updateTask :: Todo.Action -> Int -> Todo.Model -> Maybe Todo.Model
+    updateTask :: Todo.Action -> Int -> Todo.Model -> EffModel (Maybe Todo.Model) Todo.Action (dom :: DOM)
     updateTask taskAction id task =
       if task.id /= id
-      then Just task
+      then noEffects $ Just task
       else Todo.update taskAction task
 
 view :: Model -> Html Action

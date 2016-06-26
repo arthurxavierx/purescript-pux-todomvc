@@ -2,12 +2,19 @@ module Todo.Todo where
 
 import Prelude hiding (div)
 
+import Control.Apply ((*>))
+import Control.Monad.Aff (liftEff')
+import Control.Monad.Eff (Eff)
 import Control.MonadPlus (guard)
+import DOM (DOM)
 import Data.Maybe (isNothing, isJust, fromMaybe, Maybe(..))
 import Data.String (null, trim)
+import Pux (EffModel, noEffects)
 import Pux.Html (Html, input, button, text, label, div, li)
 import Pux.Html.Attributes (id_, name, checked, type_, value, className)
 import Pux.Html.Events (onKeyDown, onDoubleClick, onClick, onBlur, onChange)
+
+foreign import focusTodo :: ∀ e. Int -> Eff (dom :: DOM | e) Unit
 
 data Action
   = Nop
@@ -28,37 +35,38 @@ type Model =
 init :: String -> Int -> Model
 init description id = { id: id, description: description, completed: false, edits: Nothing }
 
-update :: Action -> Model -> Maybe Model
-update action task =
+update :: Action -> Model -> EffModel (Maybe Model) Action (dom :: DOM)
+update action todo =
   case action of
     Nop ->
-      Just task
+      noEffects $ Just todo
 
     Focus ->
-      Just task{ edits = Just task.description }
+      { state: Just todo { edits = Just todo.description }
+      , effects: [(liftEff' $ focusTodo todo.id) *> return Nop] }
 
     Cancel ->
-      Just task{ edits = Nothing }
+      noEffects $ Just todo { edits = Nothing }
 
     Commit ->
-      if isNothing task.edits
-      then Just task
-      else do
-        description <- task.edits
+      if isNothing todo.edits
+      then noEffects $ Just todo
+      else noEffects $ do
+        description <- todo.edits
         guard $ not $ null (trim description)
-        return task{ description = description, edits = Nothing }
+        return $ todo { description = description, edits = Nothing }
 
     Edit edit ->
-      Just task{ edits = Just edit }
+      noEffects $ Just todo { edits = Just edit }
 
     Check check ->
-      Just task{ completed = check }
+      noEffects $ Just todo { completed = check }
 
     Delete ->
-      Nothing
+      noEffects $ Nothing
 
 view :: Model -> Html Action
-view task =
+view todo =
   li [ className classes ]
     -- todo view
     [ div [className "view"]
@@ -66,8 +74,8 @@ view task =
       [ input
         [ className "toggle"
         , type_ "checkbox"
-        , checked task.completed
-        , onClick (const $ Check (not task.completed))
+        , checked todo.completed
+        , onClick (const $ Check (not todo.completed))
         ] []
       -- description
       , label
@@ -81,15 +89,15 @@ view task =
       [ className "edit"
       , value description
       , name "title"
-      , id_ ("todo-" ++ show task.id)
+      , id_ ("todo-" ++ show todo.id)
       , onChange (\event -> Edit event.target.value)
       , onBlur (const Commit)
       , onKeyDown keyDown
       ] []
     ]
   where
-    classes = (if task.completed then "completed " else "") ++ (if isJust task.edits then "editing" else "")
-    description = fromMaybe task.description task.edits
+    classes = (if todo.completed then "completed " else "") ++ (if isJust todo.edits then "editing" else "")
+    description = fromMaybe todo.description todo.edits
     keyDown event
       | event.keyCode == 13 = Commit
       | event.keyCode == 27 = Cancel

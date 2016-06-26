@@ -6,7 +6,7 @@ import App.Routes (match)
 import Control.Bind ((=<<))
 import Control.Monad.Eff (Eff)
 import DOM (DOM)
-import Pux (CoreEffects, Config, fromSimple, App)
+import Pux (App, CoreEffects, Config)
 import Pux.Router (sampleUrl)
 import Todo.TodoList (Action(ChangeFilter), Model, init, update, view)
 
@@ -19,7 +19,7 @@ config state = do
   let routeSignal = map (ChangeFilter <<< match) urlSignal
   return
     { initialState: state
-    , update: fromSimple update
+    , update: update
     , view: view
     , inputs: [routeSignal]
     }
