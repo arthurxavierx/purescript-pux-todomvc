@@ -5,6 +5,7 @@ node_modules
 .psci
 output
 .pulp-cache
+.psc-ide-port
 
 *.log
 npm-debug.log*
