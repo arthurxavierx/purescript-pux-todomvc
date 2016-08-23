@@ -1,10 +1,8 @@
 module Todo.Todo where
 
-import Prelude hiding (div)
-
 import Control.Apply ((*>))
-import Control.Monad.Aff (liftEff')
 import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Class (liftEff)
 import Control.MonadPlus (guard)
 import DOM (DOM)
 import Data.Maybe (isNothing, isJust, fromMaybe, Maybe(..))
@@ -13,6 +11,7 @@ import Pux (EffModel, noEffects)
 import Pux.Html (Html, input, button, text, label, div, li)
 import Pux.Html.Attributes (id_, name, checked, type_, value, className)
 import Pux.Html.Events (onKeyDown, onDoubleClick, onClick, onBlur, onChange)
+import Prelude hiding (div)
 
 foreign import focusTodo :: ∀ e. Int -> Eff (dom :: DOM | e) Unit
 
@@ -43,7 +42,7 @@ update action todo =
 
     Focus ->
       { state: Just todo { edits = Just todo.description }
-      , effects: [(liftEff' $ focusTodo todo.id) *> return Nop] }
+      , effects: [(liftEff $ focusTodo todo.id) *> pure Nop] }
 
     Cancel ->
       noEffects $ Just todo { edits = Nothing }
@@ -54,7 +53,7 @@ update action todo =
       else noEffects $ do
         description <- todo.edits
         guard $ not $ null (trim description)
-        return $ todo { description = description, edits = Nothing }
+        pure $ todo { description = description, edits = Nothing }
 
     Edit edit ->
       noEffects $ Just todo { edits = Just edit }
@@ -89,14 +88,14 @@ view todo =
       [ className "edit"
       , value description
       , name "title"
-      , id_ ("todo-" ++ show todo.id)
+      , id_ ("todo-" <> show todo.id)
       , onChange (\event -> Edit event.target.value)
       , onBlur (const Commit)
       , onKeyDown keyDown
       ] []
     ]
   where
-    classes = (if todo.completed then "completed " else "") ++ (if isJust todo.edits then "editing" else "")
+    classes = (if todo.completed then "completed " else "") <> (if isJust todo.edits then "editing" else "")
     description = fromMaybe todo.description todo.edits
     keyDown event
       | event.keyCode == 13 = Commit
